@@ -33,16 +33,16 @@ class Snake_Game():
 
     def validate_move(self, action):
         temp_pos = self.snake_head + self.direction[action]
-        print('HEAD', self.snake_head, 'TEMP', temp_pos)
-        
-        ## if touch it self
-        if self.board[tuple(temp_pos)] == SNAKE_PART:
-            return False
+        # print('HEAD', self.snake_head, 'TEMP', temp_pos)
 
         if temp_pos[0] < 0 or temp_pos[0] >= self.width:
             return False
-        
+
         if temp_pos[1] < 0 or temp_pos[1] >= self.height:
+            return False
+
+        ## if touch it self
+        if self.board[tuple(temp_pos)] == SNAKE_PART:
             return False
 
         return True
@@ -55,7 +55,7 @@ class Snake_Game():
         self.snake_body.append(self.snake_head.copy())
 
         ## Check move
-        if not self.validate_move(action): 
+        if not self.validate_move(action):
             reward = -1
             game_end = True
         else:
@@ -70,20 +70,19 @@ class Snake_Game():
         else:
             self.board[tuple(self.snake_body[0])] = 0
             self.snake_body.remove(self.snake_body[0])
-          
+
         package = (self.board, self.snake_head, self.apple, self.snake_body)
-        print(self.board)
+        # print(self.board)
         return package, reward, game_end
 
     def get_action(self):
         pass
 
 
-game = Snake_Game()
-print(game.reset())
-
-while(True):
-    action = int(input())
-    package, reward, end = game.step(action)
-    print('Reward', reward)
-
+# game = Snake_Game()
+# print(game.reset())
+#
+# while(True):
+#     action = int(input())
+#     package, reward, end = game.step(action)
+#     print('Reward', reward)

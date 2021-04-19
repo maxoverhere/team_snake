@@ -10,7 +10,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from Networks.tron_net import TronNet
+from neural_link import NeuralLink
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'is_final'))
@@ -35,7 +35,7 @@ class ReplayMem(object):
 
 class DQN:
     def __init__(self, model_name='default'):
-        super(TronPlayerDQN, self).__init__()
+        super(DQN, self).__init__()
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print("running on", self.device)
         self.epoch = 0
@@ -50,24 +50,15 @@ class DQN:
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.memory = ReplayMem(10000)
 
-    def preprocess(self, raw_state):
-        board, _location = raw_state
-        board = torch.from_numpy(board).unsqueeze(dim=0).float().to(self.device)
-        state = torch.zeros_like(board).repeat(2, 1, 1)
-        state[0, _location[0][0], _location[0][1]] = 1
-        state[1, _location[1][0], _location[1][1]] = 1
-        return torch.cat((board, state), dim=0)
-
-    def get_action(self, raw_state):
-        state = self.preprocess(raw_state).unsqueeze(dim=0)
+    def get_action(self, state):
         pred_v = self.policy_net(state)
         a = torch.argmax(pred_v, dim=1)
         # v = torch.gather(pred_v, dim=1, a)
         return a
 
-    def train_model(self, n_batch, raw_state, action, next_raw_state, reward, end_game):
-        self.memory.push(self.preprocess(raw_state), action,
-            self.preprocess(next_raw_state).unsqueeze(dim=0), torch.tensor([reward], device=self.device), torch.tensor([end_game], device=self.device))
+    def train_model(self, n_batch, state, action, next_state, reward, end_game):
+        self.memory.push(state.squeeze(dim=0), action,
+            next_state.squeeze(dim=0), torch.tensor([reward], device=self.device), torch.tensor([end_game], device=self.device))
         if end_game:
             self.epoch += 1
             just_updated = True
@@ -86,7 +77,7 @@ class DQN:
         non_final_mask = ~(torch.tensor(batch.is_final)) #flip is_final tensor
         non_final_next_states = [s for s, is_final in zip(batch.next_state, batch.is_final)
             if is_final == False]
-        non_final_next_states = torch.cat(non_final_next_states) if len(non_final_next_states) != 0 else None
+        non_final_next_states = torch.stack(non_final_next_states) if len(non_final_next_states) != 0 else None
         # pass through network
         v = self.policy_net(state_batch)
         # print(v[0:10])
