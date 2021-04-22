@@ -10,60 +10,49 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from neural_link import NeuralLink
-
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward', 'is_final'))
-
-class ReplayMem(object):
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.memory = []
-        self.position = 0
-
-    def push(self, *args):
-        if len(self.memory) < self.capacity:
-            self.memory.append(None)
-        self.memory[self.position] = Transition(*args)
-        self.position = (self.position + 1) % self.capacity
-
-    def sample(self, n_batch):
-        return random.sample(self.memory, n_batch)
-
-    def __len__(self):
-        return len(self.memory)
+from ConvNetwork import *
 
 class DQN:
-    def __init__(self, model_name='default'):
+    def __init__(self, model_name='default', lr=1e-4, replayMemSize=10000, targetUpdate=10):
         super(DQN, self).__init__()
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print("running on", self.device)
         self.epoch = 0
         self.model_name = model_name
-        self.target_update = 10
+        #variables
+        self.memory = ReplayMemory(replayMemSize)
+        self.target_update = targetUpdate
         # models
-        self.policy_net = NeuralLink().to(self.device)
-        # optimisers
-        self.optimiser = optim.Adam(self.policy_net.parameters(), lr=0.001)
+        self.policy_net = DuelingDQN().to(self.device)
+        self.target_net = DuelingDQN().to(self.device)
+        self.optimiser = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.load_weights()
-        self.target_net = NeuralLink().to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.memory = ReplayMem(10000)
+
+    def process(self, raw_state):
+        board, snake_head, apple, snake_body = raw_state
+        state = torch.zeros(board.shape, device=self.device, dtype=torch.float).unsqueeze(0).repeat(3, 1, 1)
+        state[0][tuple(apple)] = 1
+        state[1][tuple(snake_head)] = 1
+        try:
+          state[2][[tuple(x) for x in snake_body]] = 1
+        except:
+          print("An exception occurred", snake_body)
+        return board, state
 
     def get_action(self, state):
         pred_v = self.policy_net(state)
-        a = torch.argmax(pred_v, dim=1)
-        # v = torch.gather(pred_v, dim=1, a)
+        if random.random() < 0.9:
+            a = torch.argmax(pred_v, dim=1)
+        else:
+            a = torch.tensor([[random.randrange(4)]], device=self.device, dtype=torch.long).squeeze(dim=0)
         return a
 
     def train_model(self, n_batch, state, action, next_state, reward, end_game):
+        self.target_net.eval()
+        self.policy_net.train()
         self.memory.push(state.squeeze(dim=0), action,
             next_state.squeeze(dim=0), torch.tensor([reward], device=self.device), torch.tensor([end_game], device=self.device))
-        if end_game:
-            self.epoch += 1
-            just_updated = True
-        else:
-            just_updated = False
         if len(self.memory) < n_batch:
             return
         transitions = self.memory.sample(n_batch)
@@ -97,8 +86,10 @@ class DQN:
         # torch.nn.utils.clip_grad_norm_(self.actor_param, self.max_g, norm_type=2) # to prevent gradient expansion, set max
         self.optimiser.step()
         # update target network if needed
-        if just_updated and self.epoch % self.target_update == 0:
-            self.target_net.load_state_dict(self.policy_net.state_dict())
+        if end_game:
+            self.epoch += 1
+            if self.epoch % self.target_update == 0:
+                self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def load_weights(self):
         fname = path.join('models', self.model_name)

@@ -56,7 +56,7 @@ class Snake_Game():
 
         ## Check move
         if not self.validate_move(action):
-            reward = -1
+            reward = -10
             game_end = True
         else:
             self.snake_head += self.direction[action]
@@ -66,7 +66,7 @@ class Snake_Game():
         if (self.snake_head[0] == self.apple[0] and self.snake_head[1] == self.apple[1]):
             self.apple = self.get_apple()
             self.board[tuple(self.apple)] = APPLE_PART
-            reward = 1
+            reward = 10
         else:
             self.board[tuple(self.snake_body[0])] = 0
             self.snake_body.remove(self.snake_body[0])
