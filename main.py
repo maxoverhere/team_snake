@@ -8,7 +8,7 @@ import torch
 from datetime import timedelta
 
 def train(epochs=5000, update_interval=500):
-    BOARD_SIZE = 40
+    BOARD_SIZE = 10
     g = Snake_Game(width=BOARD_SIZE, height=BOARD_SIZE)
     p = DQN(model_name="default2")
     stime = time.time()
@@ -25,7 +25,7 @@ def train(epochs=5000, update_interval=500):
             board, next_state = p.process(next_state)
             next_state = next_state.unsqueeze(0)
             # def train_model(self, n_batch, state, action, next_state, reward, end_game):
-            p.train_model(100, state, action, next_state, reward, game_end)
+            p.train_model(250, state, action, next_state, reward, game_end)
             state = next_state
             steps += 1
         n_apple_count += apple_count
@@ -36,4 +36,4 @@ def train(epochs=5000, update_interval=500):
             stime = time.time()
             steps, n_apple_count = 0, 0
 
-train(update_interval=1000)
+train(update_interval=100)

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 # Code taken from https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 
 
-Transition = namedtuple("Transition", ("state", "action", "next_state", "reward"))
+Transition = namedtuple("Transition", ("state", "action", "next_state", "reward", "is_final"))
 
 
 class ReplayMemory:
@@ -53,14 +53,14 @@ class ReplayMemory:
 class DuelingDQN(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=8, stride=4)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=4, stride=2)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=2, stride=1)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=1, stride=1)
 
-        self.fc_adv1 = nn.Linear(3136, 512)
+        self.fc_adv1 = nn.Linear(576, 512)
         self.fc_adv2 = nn.Linear(512, 4)
 
-        self.fc_val1 = nn.Linear(3136, 512)
+        self.fc_val1 = nn.Linear(576, 512)
         self.fc_val2 = nn.Linear(512, 1)
 
     # Called with either one element to determine next action, or a batch
