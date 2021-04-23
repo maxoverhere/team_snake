@@ -12,61 +12,51 @@ from torch.distributions import Categorical
 
 from ConvNetwork import *
 
-class DQN:
-    def __init__(self, model_name='default', lr=1e-4, replayMemSize=10000, targetUpdate=10):
-        super(DQN, self).__init__()
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        print("running on", self.device)
+class DQNWrapper:
+    def __init__(self, model_config, optimizer_config):
+        super(DQNWrapper, self).__init__()
+        #DEVICE and other basics
+        self.device = model_config['device']
+        self.save_name = model_config['save_name']
+        #MODELS
         self.epoch = 0
-        self.model_name = model_name
-        #variables
-        self.memory = ReplayMemory(replayMemSize)
-        self.target_update = targetUpdate
-        # models
         self.policy_net = DuelingDQN().to(self.device)
         self.target_net = DuelingDQN().to(self.device)
-        self.optimiser = optim.Adam(self.policy_net.parameters(), lr=lr)
-        self.load_weights()
-        self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.optimiser = optim.Adam(self.policy_net.parameters(), lr=optimizer_config['lr'])
+        self.load_weights() #load weights for policy net
+        self.target_net.load_state_dict(self.policy_net.state_dict()) #load target net from policy net
+        self.memory = ReplayMemory(optimizer_config['replayMemorySize'])
+        self.target_update = optimizer_config['targetNetUpdate']
+        self.train_n_batch = optimizer_config['trainBatchSize']
+        self.epsilon = optimizer_config['epsilon']
 
-    def process(self, raw_state):
-        board, snake_head, apple, snake_body = raw_state
-        state = torch.zeros(board.shape, device=self.device, dtype=torch.float).unsqueeze(0).repeat(3, 1, 1)
-        state[0][tuple(apple)] = 1
-        state[1][tuple(snake_head)] = 1
-        try:
-          state[2][[tuple(x) for x in snake_body]] = 1
-        except:
-          print("An exception occurred", snake_body)
-        return board, state
-
+    #state is np array
     def get_action(self, state):
-        pred_v = self.policy_net(state)
-        if random.random() < 0.9:
-            a = torch.argmax(pred_v, dim=1)
+        if random.random() < self.epsilon: #exploit
+            return np.random.randint(3)
         else:
-            a = torch.tensor([[random.randrange(4)]], device=self.device, dtype=torch.long).squeeze(dim=0)
-        return a
+            pred_v = self.policy_net(state.to(self.device))
+            return torch.argmax(pred_v, dim=1).item()
 
-    def train_model(self, n_batch, state, action, next_state, reward, end_game):
+    def train_model(self, state, action, next_state, reward, end_game):
         self.target_net.eval()
         self.policy_net.train()
-        self.memory.push(state.squeeze(dim=0), action,
-            next_state.squeeze(dim=0), torch.tensor([reward], device=self.device), torch.tensor([end_game], device=self.device))
-        if len(self.memory) < n_batch:
+        self.memory.push(state.to(self.device), torch.tensor([action], device=self.device),
+            next_state.to(self.device), torch.tensor([reward], device=self.device), torch.tensor([end_game], device=self.device))
+        if len(self.memory) < self.train_n_batch:
             return
-        transitions = self.memory.sample(n_batch)
+        transitions = self.memory.sample(self.train_n_batch)
         # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
         # detailed explanation). This converts batch-array of Transitions
         # to Transition of batch-arrays.
         batch = Transition(*zip(*transitions))
-        state_batch = torch.stack(batch.state)
+        state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
         non_final_mask = ~(torch.tensor(batch.is_final)) #flip is_final tensor
         non_final_next_states = [s for s, is_final in zip(batch.next_state, batch.is_final)
             if is_final == False]
-        non_final_next_states = torch.stack(non_final_next_states) if len(non_final_next_states) != 0 else None
+        non_final_next_states = torch.cat(non_final_next_states) if len(non_final_next_states) != 0 else None
         # pass through network
         v = self.policy_net(state_batch)
         # print(v[0:10])
@@ -74,7 +64,7 @@ class DQN:
         pred_v = torch.gather(v, dim=1, index=action_batch.unsqueeze(dim=0))
         # print(pred_v.shape, pred_v[0:10])
         # calculate actual
-        next_v_ = torch.zeros(n_batch, device=self.device)
+        next_v_ = torch.zeros(self.train_n_batch, device=self.device)
         if non_final_next_states is not None:
             next_v_[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
         actual_v = (next_v_ * 0.95) + reward_batch
@@ -90,9 +80,10 @@ class DQN:
             self.epoch += 1
             if self.epoch % self.target_update == 0:
                 self.target_net.load_state_dict(self.policy_net.state_dict())
+        return loss
 
     def load_weights(self):
-        fname = path.join('models', self.model_name)
+        fname = path.join('models', self.save_name)
         if os.path.exists(fname):
             checkpoint = torch.load(fname)
             self.policy_net.load_state_dict(checkpoint['model_state_dict'])
@@ -100,10 +91,10 @@ class DQN:
             self.epoch = checkpoint['epoch']
             print('Loaded with', self.epoch, 'epochs.')
         else:
-            print('weights not found for', self.model_name)
+            print('weights not found for', self.save_name)
 
     def save_weights(self):
-        _filename = path.join('models', self.model_name)
+        _filename = path.join('models', self.save_name)
         torch.save({
             'epoch': self.epoch,
             'model_state_dict': self.policy_net.state_dict(),

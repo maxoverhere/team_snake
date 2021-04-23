@@ -1,39 +1,65 @@
-from DeepQLearning import DQN
-from LinearNetwork import LinearModel
-
-from snake_game import Snake_Game
+from gameplay.environment import Environment
+from DeepQLearning import DQNWrapper
 
 import time
 import torch
+import json
 from datetime import timedelta
 
-def train(epochs=5000, update_interval=500, lr=1e-4):
-    BOARD_SIZE = 5
-    g = Snake_Game(width=BOARD_SIZE, height=BOARD_SIZE)
-    p = DQN(model_name="default2", lr=lr)
-    stime = time.time()
-    steps, n_apple_count = 0, 0
-    for epoch in range(1, epochs+1):
-        state = g.reset()
-        board, state = p.process(state)
-        state = state.unsqueeze(0)
-        game_end = False
-        while not (game_end):
+def train(config):
+    # CREATE ENVIRONMENT
+    with open(config['env']) as env_cfg:
+        snake_cfg = json.load(env_cfg)
+        env = Environment(config=snake_cfg, verbose=1)
+    p = DQNWrapper(config['model_HP'], config['training_HP']) # CREATE TRAINING WRAPPED MODEL
+    config = config['others']
+    # Some trackers
+    rewards = []
+    num_episodes = config['epochs']
+    for episode in range(num_episodes):
+        timestep = env.new_episode()
+        game_over = False
+        loss = 0.0
+        exploration_rate = 0.1
+        while not game_over:
+            state = torch.from_numpy(timestep.observation).float().unsqueeze(dim=0).unsqueeze(dim=0)
             action = p.get_action(state)
-            next_state, reward, game_end = g.step(action.item())
-            apple_count = len(next_state[3])
-            board, next_state = p.process(next_state)
-            next_state = next_state.unsqueeze(0)
-            # def train_model(self, n_batch, state, action, next_state, reward, end_game):
-            p.train_model(250, state, action, next_state, reward, game_end)
-            state = next_state
-            steps += 1
-        n_apple_count += apple_count
-        if epoch % update_interval == 0:
-            print("Elapsed time: {0} Epoch: {1}/{2} Average game steps: {3}, Average apples: {4}"
-                .format(str(timedelta(seconds=(time.time() - stime) )), str(epoch), str(epochs), steps/update_interval, n_apple_count/update_interval))
+            env.choose_action(action)
+            timestep = env.timestep()
+            # extract stuff
+            reward = timestep.reward
+            rewards.append(reward)
+            state_next = torch.from_numpy(timestep.observation).float().unsqueeze(dim=0).unsqueeze(dim=0)
+            game_over = timestep.is_episode_end
+            loss = p.train_model(state, action, state_next, reward, game_over)
+        if episode % config['console_update_interval']:
+            summary = 'Episode {0}/{1} | Loss {2} | Exploration {3} | ' + \
+                      'Fruits {4} | Timesteps {5} | Total Reward {6}'
+            print(summary.format(
+                episode + 1, num_episodes, loss, exploration_rate,
+                env.stats.fruits_eaten, env.stats.timesteps_survived, env.stats.sum_episode_rewards,
+            ))
             p.save_weights()
-            stime = time.time()
-            steps, n_apple_count = 0, 0
 
-train(update_interval=100)
+config = {
+    "env": "levels/10x10-blank.json",
+    "model_HP": {
+        "model_name": "ConvNetwork",
+        "save_name": "ConvNN1",
+        "device": 'cuda' if torch.cuda.is_available() else 'cpu'
+    },
+    "training_HP": {
+        "gamma": 0.9,
+        "epsilon": 0.1,
+        "lr": 1e-4,
+        "replayMemorySize": 10000,
+        "targetNetUpdate": 10,
+        "trainBatchSize": 512
+    },
+    "others": {
+        "epochs": 60000,
+        "console_update_interval": 10
+    }
+}
+
+train(config)
