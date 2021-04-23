@@ -7,10 +7,10 @@ import time
 import torch
 from datetime import timedelta
 
-def train(epochs=5000, update_interval=500):
-    BOARD_SIZE = 10
+def train(epochs=5000, update_interval=500, lr=1e-4):
+    BOARD_SIZE = 5
     g = Snake_Game(width=BOARD_SIZE, height=BOARD_SIZE)
-    p = DQN(model_name="default2")
+    p = DQN(model_name="default2", lr=lr)
     stime = time.time()
     steps, n_apple_count = 0, 0
     for epoch in range(1, epochs+1):

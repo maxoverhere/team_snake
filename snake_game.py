@@ -22,13 +22,15 @@ class Snake_Game():
 
     def reset(self):
         self.snake_head = np.array([ self.width//2, self.height//2 ])
-        self.snake_body = []
+        self.snake_body = [self.snake_head+i*self.direction[2] for i in range(1, 4)]
         self.snake_direction = 0
 
         self.board = np.zeros((self.width, self.height))
         self.board[tuple(self.snake_head)] = SNAKE_PART
         self.apple = self.get_apple()
         self.board[tuple(self.apple)] = APPLE_PART
+        for x in x in self.snake_body:
+            self.board[tuple(x)] = SNAKE_PART
         return self.board, self.snake_head, self.apple, self.snake_body
 
     def validate_move(self, action):
