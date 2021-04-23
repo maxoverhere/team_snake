@@ -46,7 +46,7 @@ config = {
     "model_HP": {
         "model_name": "ConvNetwork",
         "save_name": "ConvNN1",
-        "device": 'cuda' if torch.cuda.is_available() else 'cpu'
+        "device": 'cuda:4' if torch.cuda.is_available() else 'cpu'
     },
     "training_HP": {
         "gamma": 0.9,
