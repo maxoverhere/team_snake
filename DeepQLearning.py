@@ -11,7 +11,6 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 
 from ConvNetwork import *
-from LinearNetwork import *
 
 """
 Implement:

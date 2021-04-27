@@ -48,23 +48,26 @@ class ReplayMemory:
     def __len__(self):
         return len(self.memory)
 
-class StandardConvNet(nn.Module):
-    def __init__(self):
-        super().__init__()
-        # conv layers
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, stride=1)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1)
-        # fc layers
-        self.fc1 = nn.Linear(1152, 256)
-        self.fc2 = nn.Linear(256, 3)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = x.view(x.size(0), -1)
-        val = F.relu(self.fc1(x))
-        val = self.fc2(val)
-        return val
+# class StandardConvNet(nn.Module):
+#     def __init__(self, height, width, channels):
+#         super().__init__()
+#         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=8, stride=4)
+#         self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+#         self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+#         self.fc1 = nn.Linear(7 * 7 * 64, 512)
+#         self.fc2 = nn.Linear(512, 256)
+#         self.fc2 = nn.Linear(256, actions)
+#
+#     def forward(self, x):
+#         x = F.relu(self.conv1(x))
+#         x = F.relu(self.conv2(x))
+#         x = F.relu(self.conv3(x))
+#         x = F.interpolate(x, size=(16, 16), mode='bicubic', align_corners=False)
+#         x = board.view(-1, 2 * 16 * 16)
+#         x = x.view(x.size(0), -1)
+#         x = F.relu(self.fc1(x))
+#         x = F.relu(self.fc2(x)
+#         # return self.fc3(x)
 
 class DuelingConvNet(nn.Module):
     def __init__(self):
