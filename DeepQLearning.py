@@ -11,6 +11,17 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 
 from ConvNetwork import *
+from LinearNetwork import *
+
+"""
+Implement:
+ - [X] Double Q Learning
+ - [] Prioritised Experience Replay
+ - [X] Dueling networks
+ - [] Multi-step learning
+ - [] Distributed reinforcement learning
+ - [] Noisy linear layers
+"""
 
 class DQNWrapper:
     def __init__(self, model_config, optimizer_config):
@@ -18,17 +29,24 @@ class DQNWrapper:
         #DEVICE and other basics
         self.device = model_config['device']
         self.save_name = model_config['save_name']
-        #MODELS
-        self.epoch = 0
-        self.policy_net = DuelingDQN().to(self.device)
-        self.target_net = DuelingDQN().to(self.device)
-        self.optimiser = optim.Adam(self.policy_net.parameters(), lr=optimizer_config['lr'])
-        self.load_weights() #load weights for policy net
-        self.target_net.load_state_dict(self.policy_net.state_dict()) #load target net from policy net
-        self.memory = ReplayMemory(optimizer_config['replayMemorySize'])
         self.target_update = optimizer_config['targetNetUpdate']
         self.train_n_batch = optimizer_config['trainBatchSize']
         self.epsilon = optimizer_config['epsilon']
+        self.memory = ReplayMemory(optimizer_config['replayMemorySize'])
+        #OPTIONS
+        self.is_dueling = model_config['is_dueling']
+        self.is_doubleL = model_config['is_doubleL']
+        #MODELS
+        self.epoch = 0
+        if (self.is_dueling):
+            self.policy_net = DuelingConvNet().to(self.device)
+            self.target_net = DuelingConvNet().to(self.device)
+        else:
+            self.policy_net = StandardConvNet().to(self.device)
+            self.target_net = StandardConvNet().to(self.device)
+        self.load_weights() #load weights for policy net
+        self.target_net.load_state_dict(self.policy_net.state_dict()) #load target net from policy net
+        self.optimiser = optim.Adam(self.policy_net.parameters(), lr=optimizer_config['lr'])
 
     #state is np array
     def get_action(self, state):
@@ -57,16 +75,20 @@ class DQNWrapper:
         non_final_next_states = [s for s, is_final in zip(batch.next_state, batch.is_final)
             if is_final == False]
         non_final_next_states = torch.cat(non_final_next_states) if len(non_final_next_states) != 0 else None
-        # pass through network
+        # pass state through policy net to get predicted v
         v = self.policy_net(state_batch)
-        # print(v[0:10])
-        # print(action_batch[0:10])
         pred_v = torch.gather(v, dim=1, index=action_batch.unsqueeze(dim=0))
-        # print(pred_v.shape, pred_v[0:10])
-        # calculate actual
+        # calculate actual v
+        if (self.is_doubleL):
+            # use policy_net to determine next action
+            next_action = self.policy_net(non_final_next_states).max(1)[0].detach()
+            # use target_net to predict next_next_state value
+            non_final_next_v_ = self.target_net(non_final_next_states).gather(1, next_action).squeeze()
+        else:
+            non_final_next_v_ = self.target_net(non_final_next_states).max(1)[0].detach()
         next_v_ = torch.zeros(self.train_n_batch, device=self.device)
         if non_final_next_states is not None:
-            next_v_[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
+            next_v_[non_final_mask] = non_final_next_v_.detach()
         actual_v = (next_v_ * 0.95) + reward_batch
         # Compute Huber loss
         loss = F.smooth_l1_loss(pred_v, actual_v.unsqueeze(0))
@@ -83,7 +105,7 @@ class DQNWrapper:
         return loss
 
     def load_weights(self):
-        fname = path.join('models', self.save_name)
+        fname = path.join('saved_models', self.save_name)
         if os.path.exists(fname):
             checkpoint = torch.load(fname)
             self.policy_net.load_state_dict(checkpoint['model_state_dict'])
@@ -94,7 +116,7 @@ class DQNWrapper:
             print('weights not found for', self.save_name)
 
     def save_weights(self):
-        _filename = path.join('models', self.save_name)
+        _filename = path.join('saved_models', self.save_name)
         torch.save({
             'epoch': self.epoch,
             'model_state_dict': self.policy_net.state_dict(),

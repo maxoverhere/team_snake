@@ -14,7 +14,6 @@ Transition = namedtuple("Transition", ("state", "action", "next_state", "reward"
 
 
 class ReplayMemory:
-
     __slots__ = ["capacity", "memory", "position"]
 
     def __init__(self, capacity):
@@ -49,16 +48,34 @@ class ReplayMemory:
     def __len__(self):
         return len(self.memory)
 
-
-class DuelingDQN(nn.Module):
+class StandardConvNet(nn.Module):
     def __init__(self):
         super().__init__()
+        # conv layers
         self.conv1 = nn.Conv2d(1, 16, kernel_size=3, stride=1)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1)
+        # fc layers
+        self.fc1 = nn.Linear(1152, 256)
+        self.fc2 = nn.Linear(256, 3)
 
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = x.view(x.size(0), -1)
+        val = F.relu(self.fc1(x))
+        val = self.fc2(val)
+        return val
+
+class DuelingConvNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # conv layers
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, stride=1)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1)
+        # adv layers
         self.fc_adv1 = nn.Linear(1152, 256)
         self.fc_adv2 = nn.Linear(256, 3)
-
+        # value layers
         self.fc_val1 = nn.Linear(1152, 256)
         self.fc_val2 = nn.Linear(256, 1)
 

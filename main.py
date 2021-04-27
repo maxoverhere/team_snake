@@ -32,7 +32,7 @@ def train(config):
             state_next = torch.from_numpy(timestep.observation).float().unsqueeze(dim=0).unsqueeze(dim=0)
             game_over = timestep.is_episode_end
             loss = p.train_model(state, action, state_next, reward, game_over)
-        if episode % config['console_update_interval']:
+        if episode % config['console_update_interval'] == 0:
             summary = 'Episode {0}/{1} | Loss {2} | Exploration {3} | ' + \
                       'Fruits {4} | Timesteps {5} | Total Reward {6}'
             print(summary.format(
@@ -42,11 +42,11 @@ def train(config):
             p.save_weights()
 
 config = {
-    "env": "levels/10x10-blank.json",
+    "env": "levels/5x5-blank.json",
     "model_HP": {
         "model_name": "ConvNetwork",
         "save_name": "ConvNN1",
-        "device": 'cuda:4' if torch.cuda.is_available() else 'cpu'
+        "device": 'cuda:0' if torch.cuda.is_available() else 'cpu'
     },
     "training_HP": {
         "gamma": 0.9,

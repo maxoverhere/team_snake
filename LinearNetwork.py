@@ -6,11 +6,11 @@ import torch.nn.functional as F
 class LinearModel(nn.Module):
     def __init__(self):
         super(LinearModel, self).__init__()
-        self.fc1 = nn.Linear(75, 512)
-        self.fc2 = nn.Linear(512, 4)
+        self.fc1 = nn.Linear(25, 256)
+        self.fc2 = nn.Linear(256, 3)
 
     def forward(self, board):
-        board = self.fc1(board.view(-1, 75))
+        board = self.fc1(board.squeeze(dim=1).view(-1, 25))
         board = F.relu(board)
         board = self.fc2(board)
         return board

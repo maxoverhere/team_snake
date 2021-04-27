@@ -156,7 +156,7 @@ class Environment(object):
         if self.timestep_index >= self.max_step_limit:
             self.is_game_over = True
             self.stats.termination_reason = 'timestep_limit_exceeded'
-
+        
         result = TimestepResult(
             observation=self.get_observation(),
             reward=reward,
