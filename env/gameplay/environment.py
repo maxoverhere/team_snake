@@ -112,10 +112,16 @@ class Environment(object):
         """ Choose the action that will be taken at the next timestep. """
 
         self.current_action = action
-        if action == SnakeAction.TURN_LEFT:
-            self.snake.turn_left()
-        elif action == SnakeAction.TURN_RIGHT:
+        if action == 0:
+            self.snake.turn_up()
+        elif action == 1:
             self.snake.turn_right()
+        elif action == 2:
+            self.snake.turn_down()
+        else:
+            self.snake.turn_left()
+        # elif action == SnakeAction.TURN_RIGHT:
+        #     self.snake.turn_right()
 
     def timestep(self):
         """ Execute the timestep and return the new observable state. """
@@ -125,7 +131,6 @@ class Environment(object):
 
         old_head = self.snake.head
         old_tail = self.snake.tail
-
         # Are we about to eat the fruit?
         if self.snake.peek_next_move() == self.fruit:
             self.snake.grow()
@@ -156,7 +161,7 @@ class Environment(object):
         if self.timestep_index >= self.max_step_limit:
             self.is_game_over = True
             self.stats.termination_reason = 'timestep_limit_exceeded'
-        
+
         result = TimestepResult(
             observation=self.get_observation(),
             reward=reward,

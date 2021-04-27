@@ -26,13 +26,15 @@ Implement:
 class DQNWrapper:
     def __init__(self, model_config, optimizer_config):
         super(DQNWrapper, self).__init__()
+        print("help")
         #DEVICE and other basics
         self.device = model_config['device']
         self.save_name = model_config['save_name']
         self.target_update = optimizer_config['targetNetUpdate']
         self.train_n_batch = optimizer_config['trainBatchSize']
         self.epsilon = optimizer_config['epsilon']
-        self.memory = ReplayMemory(optimizer_config['replayMemorySize'])
+        self.memory_max = optimizer_config['replayMemorySize']
+        self.memory = ReplayMemory(self.memory_max)
         #OPTIONS
         self.is_dueling = model_config['is_dueling']
         self.is_doubleL = model_config['is_doubleL']
@@ -42,19 +44,25 @@ class DQNWrapper:
             self.policy_net = DuelingConvNet().to(self.device)
             self.target_net = DuelingConvNet().to(self.device)
         else:
+            # self.policy_net = StandardConvNet().to(self.device)
             self.policy_net = StandardConvNet().to(self.device)
             self.target_net = StandardConvNet().to(self.device)
+            # self.target_net = StandardConvNet().to(self.device)
+        self.optimiser = optim.Adam(self.policy_net.parameters(), lr=optimizer_config['lr'])
+        # load stuff
         self.load_weights() #load weights for policy net
         self.target_net.load_state_dict(self.policy_net.state_dict()) #load target net from policy net
-        self.optimiser = optim.Adam(self.policy_net.parameters(), lr=optimizer_config['lr'])
 
     #state is np array
     def get_action(self, state):
-        if random.random() < self.epsilon: #exploit
+        if len(self.memory) < self.memory_max or random.random() < self.epsilon: #exploit
             return np.random.randint(3)
         else:
             pred_v = self.policy_net(state.to(self.device))
             return torch.argmax(pred_v, dim=1).item()
+
+    def is_mem_full(self):
+        return len(self.memory) < self.memory_max
 
     def train_model(self, state, action, next_state, reward, end_game):
         self.target_net.eval()
@@ -62,7 +70,7 @@ class DQNWrapper:
         self.memory.push(state.to(self.device), torch.tensor([action], device=self.device),
             next_state.to(self.device), torch.tensor([reward], device=self.device), torch.tensor([end_game], device=self.device))
         if len(self.memory) < self.train_n_batch:
-            return
+            return -1
         transitions = self.memory.sample(self.train_n_batch)
         # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
         # detailed explanation). This converts batch-array of Transitions
@@ -89,9 +97,12 @@ class DQNWrapper:
         next_v_ = torch.zeros(self.train_n_batch, device=self.device)
         if non_final_next_states is not None:
             next_v_[non_final_mask] = non_final_next_v_.detach()
-        actual_v = (next_v_ * 0.95) + reward_batch
+        actual_v = (next_v_ * (0.95 ** 1)) + reward_batch
+        # ALSO NEED TO UPDATE REWARD TO BE N_STEPS
         # Compute Huber loss
-        loss = F.smooth_l1_loss(pred_v, actual_v.unsqueeze(0))
+        loss = nn.MSELoss()
+        loss = loss(pred_v, actual_v.unsqueeze(0))
+        # loss = F.smooth_l1_loss(actual_v.unsqueeze(0), pred_v)
         # optimize the model
         self.optimiser.zero_grad()
         loss.backward()

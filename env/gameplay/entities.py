@@ -56,6 +56,7 @@ ALL_SNAKE_ACTIONS = [
     SnakeAction.MAINTAIN_DIRECTION,
     SnakeAction.TURN_LEFT,
     SnakeAction.TURN_RIGHT,
+    3,
 ]
 
 
@@ -99,13 +100,21 @@ class Snake(object):
 
     def turn_left(self):
         """ At the next step, take a left turn relative to the current direction. """
-        direction_idx = self.directions.index(self.direction)
-        self.direction = self.directions[direction_idx - 1]
+        self.direction = SnakeDirection.WEST
+        # direction_idx = self.directions.index(self.direction)
+        # self.direction = self.directions[direction_idx - 1]
 
     def turn_right(self):
         """ At the next step, take a right turn relative to the current direction. """
-        direction_idx = self.directions.index(self.direction)
-        self.direction = self.directions[(direction_idx + 1) % len(self.directions)]
+        self.direction = SnakeDirection.EAST
+        # direction_idx = self.directions.index(self.direction)
+        # self.direction = self.directions[(direction_idx + 1) % len(self.directions)]
+
+    def turn_up(self):
+        self.direction = SnakeDirection.NORTH
+
+    def turn_down(self):
+        self.direction = SnakeDirection.SOUTH
 
     def grow(self):
         """ Grow the snake by 1 block from the head. """
